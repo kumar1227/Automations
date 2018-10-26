@@ -1,0 +1,2 @@
+bash-4.1$ java -jar jenkins-cli.jar -auth e631493:<password> -s http://sdpdevops-je2.statestr.com:8080/jenkins/ get-job "SPD/Local/spd_fw/spd_fw_localBuild_Package" > config_job.xml
+bash-4.1$ java -jar jenkins-cli.jar -auth e631493:<password> -s http://sdpdevops-je1.statestr.com:8080/jenkins/ create-job "SPD/Local/spd_fw/spd_fw_localBuild_Package" < config_job.xml
