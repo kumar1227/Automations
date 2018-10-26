@@ -1,0 +1,99 @@
+set +x
+
+echo "====================[START] Removing old files in the workspace==============================="
+rm -rf orglist.properties
+rm -rf fullorgname.properties
+rm -rf teams.txt
+rm -rf teamsID.properties
+rm -rf Syncout
+rm -rf teamsName.properties
+rm -rf ldapName.properties
+rm -rf teams_idprop.csv
+echo "====================[START] Removing old files in the workspace==============================="
+
+if [ "$GIT_ENV" == "DEV" ]
+then
+	GIT_URL="https://gitdev.it.statestr.com"
+elif [ "$GIT_ENV" == "UA" ]
+then
+	GIT_URL="https://gitua.statestr.com"
+elif [ "$GIT_ENV" == "PROD" ]
+then
+	GIT_URL="https://gitprod.statestr.com"
+else
+	echo "Please select the GIT environment"
+    exit
+fi
+
+x=1
+while [ $x -le 100 ]
+do
+curl -XGET -u "e619380:bd2d1a3bc24a0db01ab2325745f46d7409333729" "${GIT_URL}/api/v3/user/repos?per_page=100\&page=$x"  >> orglist.properties
+x=$(( $x + 1 ))
+done
+
+cat orglist.properties | grep '"full_name"' | awk -F ':' '{print $2}' | tr -d "[:blank:]" | tr -d , | tr -d '\"' | grep -v ^e | grep -v ^p | cut -d'/' -f1 | uniq > fullorgname.properties
+
+while read org
+do
+curl -XGET -u "e619380:bd2d1a3bc24a0db01ab2325745f46d7409333729" "${GIT_URL}/api/v3/orgs/$org/teams" >> teams.txt
+done < fullorgname.properties
+
+cat teams.txt | tr -d ,|grep '"id"' | awk -F ':' '{print $2}' | tr -d "[:blank:]" > teamsID.properties
+cat teams.txt | grep '"name"' | awk -F '"' '{print $4}' > teamsName.properties
+cat teams.txt | grep ldap_dn | awk -F '"' '{print $4}' > ldapName.properties
+paste -d '#' teamsID.properties teamsName.properties ldapName.properties > teams_idprop.csv
+
+echo "======================[START] Copying files to home Directory========================================"
+cat fullorgname.properties > /root/LdapFiles/fullorgname.properties
+cat teamsID.properties > /root/LdapFiles/teamsID.properties
+cat teamsName.properties > /root/LdapFiles/teamsName.properties
+cat ldapName.properties > /root/LdapFiles/ldapName.properties
+cat teams_idprop.csv > /root/LdapFiles/teams_idprop.csv
+echo "======================[END] Copying files to home Directory========================================"
+
+match_Ldap_names=( "Asia" "Canada" "Corporate Managed Objects" "NMS Managed Objects" "France" "Germany" "Investment Management" "Ireland" "IS AMS" "IS UK" "Italy" "India" "Princeton" "SSGM Sydney" "State Street Associates" )
+new_Ldap_names=( "OU=Users and Groups,OU=SSTZ,OU=Asia, DC=corp,DC=statestr,DC=com" 
+"OU=Groups,OU=Toronto,OU=Canada, DC=corp,DC=statestr,DC=com"
+"OU=Groups,OU=NMS Managed Objects,DC=corp,DC=statestr,DC=com"
+"OU=Groups,OU=NMS Managed Objects,DC=corp,DC=statestr,DC=com" 
+"OU=Groups,OU=France,DC=corp,DC=statestr,DC=com"
+"OU=Frankfurt,OU=Users,OU=Germany, DC=corp,DC=statestr,DC=com"
+"OU=Groups,OU=Investment Management,DC=corp,DC=statestr,DC=com"
+"OU=Groups,OU=Ireland,DC=corp,DC=statestr,DC=com"
+"OU=Users,OU=IS AMS,DC=corp,DC=statestr,DC=com"
+"OU=Groups,OU=IS UK,DC=corp,DC=statestr,DC=com"
+"OU=Groups,OU=Italy,DC=corp,DC=statestr,DC=com"
+"OU=Users,OU=India,OU=Joint Venture, DC=corp,DC=statestr,DC=com"
+"OU=Groups,OU=NMS Managed Objects,DC=corp,DC=statestr,DC=com"
+"OU=Groups,OU=SSGM Sydney,DC=corp,DC=statestr,DC=com"
+"OU=Users,OU=State Street Associates,DC=corp,DC=statestr,DC=com" )
+
+echo "==========================[Start] Changing the LDAP=============================================="
+
+IFS="#"
+while read f1 f2 f3
+do 
+	for (( i=0; i<15; i++ ))
+	do
+		if ( [[ "$f3" =~ "${match_Ldap_names[i]}" ]]  )
+		then
+        	echo "Sync result status for the Id: $f1, group: $f2, status: $?" >> Syncout
+			#curl -XPATCH -u "e619380:bd2d1a3bc24a0db01ab2325745f46d7409333729" ${GIT_URL}/api/v3/admin/ldap/teams/$f1/mapping -d '{"ldap_dn": "CN='$f2','${new_Ldap_names[i]}'"}';
+			echo '{"ldap_dn": "CN='$f2','${new_Ldap_names[i]}'"}'
+            echo "Status: $?" >> Syncout
+		fi
+	done
+
+done < teams_idprop.csv
+echo "==========================[END] Changing the LDAP=============================================="
+cat Syncout > /root/LdapFiles/Syncout
+echo "==========================[Start] Sync the LDAP Group========================================"
+
+while read teamid
+do 
+	echo ""
+	#curl -XPOST -u "e619380:bd2d1a3bc24a0db01ab2325745f46d7409333729" ${GIT_URL}/api/v3/admin/ldap/teams/$teamid/sync
+done < teamsID.properties
+
+echo "==========================[End] Sync the LDAP Group completed========================================"
