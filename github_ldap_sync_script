@@ -13,13 +13,13 @@ echo "====================[START] Removing old files in the workspace===========
 
 if [ "$GIT_ENV" == "DEV" ]
 then
-	GIT_URL="https://gitdev.it.statestr.com"
+	GIT_URL="https://dev.github.com"
 elif [ "$GIT_ENV" == "UA" ]
 then
-	GIT_URL="https://gitua.statestr.com"
+	GIT_URL="https://ua.github.com"
 elif [ "$GIT_ENV" == "PROD" ]
 then
-	GIT_URL="https://gitprod.statestr.com"
+	GIT_URL="https://ua.github.com"
 else
 	echo "Please select the GIT environment"
     exit
@@ -28,7 +28,7 @@ fi
 x=1
 while [ $x -le 100 ]
 do
-curl -XGET -u "e619380:bd2d1a3bc24a0db01ab2325745f46d7409333729" "${GIT_URL}/api/v3/user/repos?per_page=100\&page=$x"  >> orglist.properties
+curl -XGET -u "<user_name>:<password>" "${GIT_URL}/api/v3/user/repos?per_page=100\&page=$x"  >> orglist.properties
 x=$(( $x + 1 ))
 done
 
@@ -36,7 +36,7 @@ cat orglist.properties | grep '"full_name"' | awk -F ':' '{print $2}' | tr -d "[
 
 while read org
 do
-curl -XGET -u "e619380:bd2d1a3bc24a0db01ab2325745f46d7409333729" "${GIT_URL}/api/v3/orgs/$org/teams" >> teams.txt
+curl -XGET -u "<user_name>:<password>" "${GIT_URL}/api/v3/orgs/$org/teams" >> teams.txt
 done < fullorgname.properties
 
 cat teams.txt | tr -d ,|grep '"id"' | awk -F ':' '{print $2}' | tr -d "[:blank:]" > teamsID.properties
@@ -79,7 +79,7 @@ do
 		if ( [[ "$f3" =~ "${match_Ldap_names[i]}" ]]  )
 		then
         	echo "Sync result status for the Id: $f1, group: $f2, status: $?" >> Syncout
-			#curl -XPATCH -u "e619380:bd2d1a3bc24a0db01ab2325745f46d7409333729" ${GIT_URL}/api/v3/admin/ldap/teams/$f1/mapping -d '{"ldap_dn": "CN='$f2','${new_Ldap_names[i]}'"}';
+			#curl -XPATCH -u "<user_name>:<password>" ${GIT_URL}/api/v3/admin/ldap/teams/$f1/mapping -d '{"ldap_dn": "CN='$f2','${new_Ldap_names[i]}'"}';
 			echo '{"ldap_dn": "CN='$f2','${new_Ldap_names[i]}'"}'
             echo "Status: $?" >> Syncout
 		fi
@@ -93,7 +93,7 @@ echo "==========================[Start] Sync the LDAP Group=====================
 while read teamid
 do 
 	echo ""
-	#curl -XPOST -u "e619380:bd2d1a3bc24a0db01ab2325745f46d7409333729" ${GIT_URL}/api/v3/admin/ldap/teams/$teamid/sync
+	#curl -XPOST -u "<user_name>:<password>" ${GIT_URL}/api/v3/admin/ldap/teams/$teamid/sync
 done < teamsID.properties
 
 echo "==========================[End] Sync the LDAP Group completed========================================"
