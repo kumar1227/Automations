@@ -1,0 +1,82 @@
+set +x
+
+echo "====================[START] Removing old files in the workspace==============================="
+rm -rf updated_orglist.properties
+rm -rf updated_fullorgname.properties
+rm -rf updated_teams.txt
+rm -rf updated_teamsID.properties
+rm -rf updated_teamsName.properties
+rm -rf updated_ldapName.properties
+rm -rf updated_teams_idprop.csv
+echo "====================[START] Removing old files in the workspace==============================="
+
+if [ "$GIT_ENV" == "DEV" ]
+then
+	GIT_URL="https://gitdev.com"
+elif [ "$GIT_ENV" == "UA" ]
+then
+	GIT_URL="https://gitua.com"
+elif [ "$GIT_ENV" == "PROD" ]
+then
+	GIT_URL="https://gitprod.com"
+else
+	echo "Please select the GIT environment"
+    exit 1
+fi
+
+if [ "$CP_PATH" == "ROOT" ]
+then
+	PATH="/root/LdapFiles"
+elif [ "$CP_PATH" == "HOME" ]
+then
+	PATH="/auto/users-30/saikumar/LdapFiles"
+else
+	echo "Please select the path from where to copy files"
+    exit 1
+fi
+
+x=1
+while [ $x -le 100 ]
+do
+curl -XGET -u "<user>:<password>" ${GIT_URL}/api/v3/user/repos?per_page=100\&page=$x >> updated_orglist.properties
+x=$(( $x + 1 ))
+done
+cat updated_orglist.properties | grep '"full_name"' | awk -F ':' '{print $2}' | tr -d "[:blank:]" | tr -d , | tr -d '\"' | grep -v ^e | grep -v ^p | cut -d'/' -f1 | uniq > updated_fullorgname.properties
+
+while read org
+do
+curl -XGET -u "<user>:<password>" ${GIT_URL}/api/v3/orgs/$org/teams >> updated_teams.txt
+done < updated_fullorgname.properties
+
+cat updated_teams.txt | tr -d ,|grep '"id"' | awk -F ':' '{print $2}' | tr -d "[:blank:]" > updated_teamsID.properties
+cat updated_teams.txt | grep '"name"' | awk -F '"' '{print $4}' > updated_teamsName.properties
+cat updated_teams.txt | grep ldap_dn | awk -F '"' '{print $4}' > updated_ldapName.properties
+paste -d '#' updated_teamsID.properties updated_teamsName.properties updated_ldapName.properties > updated_teams_idprop.csv
+
+echo "======================[START] Copying backup files from root/home Directory========================================"
+cp $PATH/teams_idprop.csv .
+cp $PATH/teamsID.properties .
+echo "======================[START] Copying backup files from root/home Directory========================================"
+echo "=================================[START] Ldap Domain RollBack================================="
+IFS="#"
+while read f1 f2 f3
+do
+	IFS="#"
+    while read x1 x2 x3
+    do
+    	if ( [[ "$f1" =~ "$x1" && "$f2" =~ "$x2" ]]  )
+        then
+        	echo "Update Ldap GroupID: $f1 & GroupName: $f2 and Previous Ldap GroupID: $x1 & GroupName: $x2"
+            echo "Updated ladp_dn: $f3 and Old ladp_dn= $x3"
+           #curl -XPATCH -u "<user>:<password>" ${GIT_URL}/api/v3/admin/ldap/teams/$x1/mapping -d '{"ldap_dn": "$x3"}';
+        fi  
+    done < teams_idprop.csv
+done < updated_teams_idprop.csv
+echo "=================================[END] Ldap Domain RollBack================================="
+echo "==========================[Start] Sync the LDAP Group========================================"
+while read teamid
+do 
+	echo ""
+#	curl -XPOST -u "<user>:<password>" ${GIT_URL}/api/v3/admin/ldap/teams/"$teamid"/sync
+done < teamsID.properties
+echo "==========================[END] Sync the LDAP Group========================================"
