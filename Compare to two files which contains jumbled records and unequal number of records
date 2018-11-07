@@ -1,0 +1,5 @@
+diff file2 file1 | grep '^>' | sed 's/^>\ //'
+diff file1 file2 | grep '^>' | sed 's/^>\ //'
+
+diff file2 file1 | grep '^<' | sed 's/^<\ //'
+diff file1 file2 | grep '^<' | sed 's/^<\ //'
