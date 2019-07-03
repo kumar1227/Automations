@@ -1,0 +1,8 @@
+#cat ${JENKINS_HOME}/credentials.xml
+
+#Execute the scripts in this jenkins console:
+#http://jenkins-hostname/jenkins/script
+
+hashed_pw='<Decrypted_Password>'
+passwd = hudson.util.Secret.decrypt(hashed_pw)
+println(passwd)
